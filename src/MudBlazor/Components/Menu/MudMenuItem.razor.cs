@@ -27,14 +27,41 @@ namespace MudBlazor
         /// <summary>
         /// If set to a URL, clicking the button will open the referenced document. Use Target to specify where
         /// </summary>
-        [Parameter] 
-        [Category(CategoryTypes.Menu.ClickAction)] 
+        [Parameter]
+        [Category(CategoryTypes.Menu.ClickAction)]
         public string Href { get; set; }
+
+        /// <summary>
+        /// Icon to be used for this menu entry
+        /// </summary>
+        [Parameter]
+        [Category(CategoryTypes.List.Behavior)]
+        public string Icon { get; set; }
+        /// <summary>
+        /// The color of the icon. It supports the theme colors.
+        /// </summary>
+        [Parameter]
+        [Category(CategoryTypes.List.Appearance)]
+        public Color IconColor { get; set; } = Color.Inherit;
+        /// <summary>
+        /// The Icon Size.
+        /// </summary>
+        [Parameter]
+        [Category(CategoryTypes.List.Appearance)]
+        public Size IconSize { get; set; } = Size.Medium;
 
         [Parameter] [Category(CategoryTypes.Menu.ClickAction)] public string Target { get; set; }
         [Parameter] [Category(CategoryTypes.Menu.ClickAction)] public bool ForceLoad { get; set; }
-        [Parameter] [Category(CategoryTypes.Menu.ClickAction)] public ICommand Command { get; set; }
-        [Parameter] [Category(CategoryTypes.Menu.ClickAction)] public object CommandParameter { get; set; }
+
+        [Parameter]
+        [Category(CategoryTypes.Menu.ClickAction)]
+        [Obsolete($"Use {nameof(OnClick)} instead. This will be removed in v7.")]
+        public ICommand Command { get; set; }
+
+        [Parameter]
+        [Category(CategoryTypes.Menu.ClickAction)]
+        [Obsolete("This will be removed in v7.")]
+        public object CommandParameter { get; set; }
 
         [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
         [Parameter] public EventCallback<TouchEventArgs> OnTouch { get; set; }
@@ -55,10 +82,12 @@ namespace MudBlazor
             else
             {
                 await OnClick.InvokeAsync(ev);
+#pragma warning disable CS0618
                 if (Command?.CanExecute(CommandParameter) ?? false)
                 {
                     Command.Execute(CommandParameter);
                 }
+#pragma warning restore CS0618
             }
         }
 
@@ -78,10 +107,12 @@ namespace MudBlazor
             else
             {
                 await OnTouch.InvokeAsync(ev);
+#pragma warning disable CS0618
                 if (Command?.CanExecute(CommandParameter) ?? false)
                 {
                     Command.Execute(CommandParameter);
                 }
+#pragma warning restore CS0618
             }
         }
     }

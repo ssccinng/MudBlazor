@@ -79,7 +79,7 @@ namespace MudBlazor
         public TimeEditMode TimeEditMode { get; set; } = TimeEditMode.Normal;
 
         /// <summary>
-        /// Milliseconds to wait before closing the picker. This helps the user see that the time was selected before the popover disappears.
+        /// Sets the amount of time in milliseconds to wait before closing the picker. This helps the user see that the time was selected before the popover disappears.
         /// </summary>
         [Parameter]
         [Category(CategoryTypes.FormComponent.PickerBehavior)]
@@ -154,13 +154,15 @@ namespace MudBlazor
         {
             if (_value != time)
             {
+                Touched = true;
                 TimeIntermediate = time;
                 _value = time;
                 if (updateValue)
                     await SetTextAsync(Converter.Set(_value), false);
                 UpdateTimeSetFromTime();
                 await TimeChanged.InvokeAsync(_value);
-                BeginValidate();
+                await BeginValidateAsync();
+                FieldChanged(_value);
             }
         }
 
@@ -192,7 +194,7 @@ namespace MudBlazor
 
         protected internal override void Submit()
         {
-            if (ReadOnly)
+            if (GetReadOnlyState())
                 return;
             Time = TimeIntermediate;
         }
@@ -520,7 +522,7 @@ namespace MudBlazor
 
         protected internal override void HandleKeyDown(KeyboardEventArgs obj)
         {
-            if (Disabled || ReadOnly)
+            if (GetDisabledState() || GetReadOnlyState())
                 return;
             base.HandleKeyDown(obj);
             switch (obj.Key)
@@ -639,6 +641,8 @@ namespace MudBlazor
                     }
                     break;
             }
+
+            StateHasChanged();
         }
 
         protected void ChangeMinute(int val)

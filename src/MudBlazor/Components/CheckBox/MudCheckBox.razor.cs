@@ -17,8 +17,9 @@ namespace MudBlazor
 
         protected string LabelClassname =>
         new CssBuilder("mud-checkbox")
-            .AddClass($"mud-disabled", Disabled)
-            .AddClass($"mud-readonly", ReadOnly)
+            .AddClass($"mud-disabled", GetDisabledState())
+            .AddClass($"mud-readonly", GetReadOnlyState())
+            .AddClass("flex-row-reverse", LabelPosition == LabelPosition.Start)
         .Build();
 
         protected string CheckBoxClassname =>
@@ -26,9 +27,9 @@ namespace MudBlazor
             .AddClass($"mud-{Color.ToDescriptionString()}-text hover:mud-{Color.ToDescriptionString()}-hover", UnCheckedColor == null || (UnCheckedColor != null && BoolValue == true))
             .AddClass($"mud-{UnCheckedColor?.ToDescriptionString()}-text hover:mud-{UnCheckedColor?.ToDescriptionString()}-hover", UnCheckedColor != null && BoolValue == false)
             .AddClass($"mud-checkbox-dense", Dense)
-            .AddClass($"mud-ripple mud-ripple-checkbox", !DisableRipple && !ReadOnly && !Disabled)
-            .AddClass($"mud-disabled", Disabled)
-            .AddClass($"mud-readonly", ReadOnly)
+            .AddClass($"mud-ripple mud-ripple-checkbox", !DisableRipple && !GetReadOnlyState() && !GetDisabledState())
+            .AddClass($"mud-disabled", GetDisabledState())
+            .AddClass($"mud-readonly", GetReadOnlyState())
         .Build();
 
         /// <summary>
@@ -46,11 +47,25 @@ namespace MudBlazor
         public Color? UnCheckedColor { get; set; } = null;
 
         /// <summary>
-        /// If applied the text will be added to the component.
+        /// The text/label will be displayed next to the checkbox if set.
         /// </summary>
         [Parameter]
         [Category(CategoryTypes.FormComponent.Behavior)]
         public string Label { get; set; }
+
+        /// <summary>
+        /// The position of the text/label.
+        /// </summary>
+        [Parameter]
+        [Category(CategoryTypes.FormComponent.Behavior)]
+        public LabelPosition LabelPosition { get; set; } = LabelPosition.End;
+
+        /// <summary>
+        /// If true, the checkbox can be controlled with the keyboard.
+        /// </summary>
+        [Parameter]
+        [Category(CategoryTypes.FormComponent.Behavior)]
+        public bool KeyboardEnabled { get; set; } = true;
 
         /// <summary>
         /// If true, disables ripple effect.
@@ -148,7 +163,7 @@ namespace MudBlazor
 
         protected void HandleKeyDown(KeyboardEventArgs obj)
         {
-            if (Disabled || ReadOnly)
+            if (GetDisabledState() || GetReadOnlyState() || !KeyboardEnabled)
                 return;
             switch (obj.Key)
             {
@@ -194,6 +209,14 @@ namespace MudBlazor
 
         private string _elementId = "checkbox" + Guid.NewGuid().ToString().Substring(0, 8);
 
+        protected override void OnInitialized()
+        {
+            base.OnInitialized();
+
+            if (Label == null && For != null)
+                Label = For.GetLabelString();
+        }
+
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender)
@@ -222,7 +245,11 @@ namespace MudBlazor
 
             if (disposing == true)
             {
-                _keyInterceptor?.Dispose();
+                if(_keyInterceptor != null)
+                {
+                    _keyInterceptor.KeyDown -= HandleKeyDown;
+                    _keyInterceptor.Dispose();
+                }
             }
         }
     }

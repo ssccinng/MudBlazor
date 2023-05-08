@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using MudBlazor.Interfaces;
 using MudBlazor.Services;
 using MudBlazor.Utilities;
 
@@ -11,7 +12,7 @@ namespace MudBlazor
 {
     public partial class MudPicker<T> : MudFormComponent<T, string>
     {
-        private IKeyInterceptor _keyInterceptor;
+        protected IKeyInterceptor _keyInterceptor;
 
         public MudPicker() : base(new Converter<T, string>()) { }
         protected MudPicker(Converter<T, string> converter) : base(converter) { }
@@ -30,7 +31,7 @@ namespace MudBlazor
                 .AddClass($"mud-elevation-{_pickerElevation}", PickerVariant == PickerVariant.Static)
                 .AddClass($"mud-picker-input-button", !Editable && PickerVariant != PickerVariant.Static)
                 .AddClass($"mud-picker-input-text", Editable && PickerVariant != PickerVariant.Static)
-                .AddClass($"mud-disabled", Disabled && PickerVariant != PickerVariant.Static)
+                .AddClass($"mud-disabled", GetDisabledState() && PickerVariant != PickerVariant.Static)
                 .AddClass(Class)
                 .Build();
 
@@ -129,13 +130,6 @@ namespace MudBlazor
         public bool Square { get; set; }
 
         /// <summary>
-        /// If true, no date or time can be defined.
-        /// </summary>
-        [Parameter]
-        [Category(CategoryTypes.FormComponent.Behavior)]
-        public bool ReadOnly { get; set; }
-
-        /// <summary>
         /// If true, border-radius is set to theme default when in Static Mode.
         /// </summary>
         [Parameter]
@@ -164,11 +158,29 @@ namespace MudBlazor
         public string Label { get; set; }
 
         /// <summary>
+        /// Show clear button.
+        /// </summary>
+        [Parameter]
+        [Category(CategoryTypes.FormComponent.Behavior)]
+        public bool Clearable { get; set; } = false;
+
+        /// <summary>
         /// If true, the picker will be disabled.
         /// </summary>
         [Parameter]
         [Category(CategoryTypes.FormComponent.Behavior)]
         public bool Disabled { get; set; }
+        [CascadingParameter(Name = "ParentDisabled")] private bool ParentDisabled { get; set; }
+        protected bool GetDisabledState() => Disabled || ParentDisabled;
+
+        /// <summary>
+        /// If true, no date or time can be defined.
+        /// </summary>
+        [Parameter]
+        [Category(CategoryTypes.FormComponent.Behavior)]
+        public bool ReadOnly { get; set; }
+        [CascadingParameter(Name = "ParentReadOnly")] private bool ParentReadOnly { get; set; }
+        protected bool GetReadOnlyState() => ReadOnly || ParentReadOnly;
 
         /// <summary>
         /// If true, the picker will be editable.
@@ -327,7 +339,6 @@ namespace MudBlazor
                 if (callback)
                     await StringValueChanged(_text);
                 await TextChanged.InvokeAsync(_text);
-                FieldChanged(_text);
             }
         }
 
@@ -381,9 +392,28 @@ namespace MudBlazor
             }
         }
 
+        [Obsolete($"Use {nameof(ResetValueAsync)} instead. This will be removed in v7")]
+        [ExcludeFromCodeCoverage]
+        protected override void ResetValue()
+        {
+            _inputReference?.Reset();
+            base.ResetValue();
+        }
+
+        protected override async Task ResetValueAsync()
+        {
+            if (_inputReference is not null)
+            {
+                await _inputReference.ResetAsync();
+            }
+            await base.ResetValueAsync();
+        }
+
         protected internal MudTextField<string> _inputReference;
 
         public virtual ValueTask FocusAsync() => _inputReference?.FocusAsync() ?? ValueTask.CompletedTask;
+
+        public virtual ValueTask BlurAsync() => _inputReference?.BlurAsync() ?? ValueTask.CompletedTask;
 
         public virtual ValueTask SelectAsync() => _inputReference?.SelectAsync() ?? ValueTask.CompletedTask;
 
@@ -418,11 +448,14 @@ namespace MudBlazor
                 _pickerSquare = Square;
                 _pickerElevation = Elevation;
             }
+
+            if (Label == null && For != null)
+                Label = For.GetLabelString();
         }
 
-        protected override async Task OnAfterRenderAsync(bool firstRender)
+        private async Task EnsureKeyInterceptor()
         {
-            if (firstRender)
+            if (_keyInterceptor == null)
             {
                 _keyInterceptor = _keyInterceptorFactory.Create();
 
@@ -442,13 +475,21 @@ namespace MudBlazor
                 });
                 _keyInterceptor.KeyDown += HandleKeyDown;
             }
+        }
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (firstRender == true)
+            {
+                await EnsureKeyInterceptor();
+            }
 
             await base.OnAfterRenderAsync(firstRender);
         }
 
         protected internal void ToggleState()
         {
-            if (Disabled)
+            if (GetDisabledState() || GetReadOnlyState())
                 return;
             if (IsOpen)
             {
@@ -472,14 +513,16 @@ namespace MudBlazor
                 await _pickerInlineRef.MudChangeCssAsync(PickerInlineClass);
             }
 
+            await EnsureKeyInterceptor();
             await _keyInterceptor.UpdateKey(new() { Key = "Escape", StopDown = "key+none" });
         }
 
-        protected virtual void OnClosed()
+        protected virtual async void OnClosed()
         {
             OnPickerClosed();
 
-            _keyInterceptor?.UpdateKey(new() { Key = "Escape", StopDown = "none" });
+            await EnsureKeyInterceptor();
+            await _keyInterceptor.UpdateKey(new() { Key = "Escape", StopDown = "none" });
         }
 
         protected virtual void OnPickerOpened()
@@ -494,7 +537,7 @@ namespace MudBlazor
 
         protected internal virtual void HandleKeyDown(KeyboardEventArgs obj)
         {
-            if (Disabled || ReadOnly)
+            if (GetDisabledState() || GetReadOnlyState())
                 return;
             switch (obj.Key)
             {
@@ -520,7 +563,12 @@ namespace MudBlazor
 
             if (disposing == true)
             {
-                _keyInterceptor?.Dispose();
+                if (_keyInterceptor != null)
+                {
+                    _keyInterceptor.KeyDown -= HandleKeyDown;
+                    _keyInterceptor.Dispose();
+                }
+
             }
         }
 
